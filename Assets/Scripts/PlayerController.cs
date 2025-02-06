@@ -18,17 +18,24 @@ namespace PtTest
         Vector2 _moveDir;
         Vector2 _lookDir;
 
+        bool _lockCamera = false;
+
         int _shotCount = 0;
         int _hitCount = 0;
-        public int GetMissCount() => _shotCount - _hitCount;
-        public int GetHitCount() => _hitCount;
-        public int GetTotalShots() => _shotCount;
+        public float GetMissPercent() => 100 * (float)(_shotCount - _hitCount) / _shotCount;
+        public float GetHitPercent() => 100 * (float)_hitCount / _shotCount;
+        public float GetTotalShots() => _shotCount;
 
 
         private void Start()
         {
             //locks cursor to game window
             Cursor.lockState = CursorLockMode.Locked;
+            GameManager.OnGameEnd.AddListener(() =>
+            {
+                _lockCamera = true;
+                Cursor.lockState = CursorLockMode.None;
+            });
         }
 
         public void OnMove(InputAction.CallbackContext obj)
@@ -39,10 +46,10 @@ namespace PtTest
         public void OnLook(InputAction.CallbackContext obj)
         {
             _lookDir += obj.ReadValue<Vector2>();
-            _lookDir.y = Mathf.Clamp(_lookDir.y, -90, 90);
-
+            _lookDir.y = Mathf.Clamp(_lookDir.y, -180, 180);
         }
 
+        //cast a ray and see if we hit a target
         public void OnAttack(InputAction.CallbackContext obj)
         {
             Ray ray = new(transform.position + transform.forward, _cameraTransform.forward);
@@ -60,9 +67,14 @@ namespace PtTest
         {
             transform.position += (transform.forward * _moveDir.y + transform.right * _moveDir.x) * _moveSpeed * Time.deltaTime;
 
-            transform.rotation = Quaternion.Euler(new Vector3(0, _lookDir.x, 0) * _rotationSpeed);
-            _cameraTransform.localRotation = Quaternion.Euler(new Vector3(-_lookDir.y, 0, 0) * _rotationSpeed / 2.0f);
+            //rotate the camera/player
+            if (!_lockCamera)
+            {
+                transform.rotation = Quaternion.Euler(new Vector3(0, _lookDir.x, 0) * _rotationSpeed);
+                _cameraTransform.localRotation = Quaternion.Euler(new Vector3(-_lookDir.y, 0, 0) * _rotationSpeed / 2.0f);
+            }
 
+            //cast a ray to change the colour of the reticle
             Ray ray = new(transform.position + transform.forward, _cameraTransform.forward);
             bool onTarget = Physics.Raycast(ray, out RaycastHit hitInfo, _gunRange, LayerMask.GetMask("Target"));
             _reticle.color = onTarget ? Color.red : Color.white;
